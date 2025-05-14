@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { Upload, X, FileSpreadsheet, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, AlertCircle } from 'lucide-react';
+// import {FileSpreadsheet, CheckCircle } from 'lucide-react';
 import Papa from 'papaparse';
 import { useData } from '../context/DataContext';
 import { motion } from 'framer-motion';
@@ -19,22 +20,6 @@ const FileUpload: React.FC = () => {
         setIsDragging(false);
     }, []);
 
-    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        setIsDragging(false);
-
-        const files = e.dataTransfer.files;
-        if (files.length) {
-            handleFile(files[0]);
-        }
-    }, []);
-
-    const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (files && files.length > 0) {
-            handleFile(files[0]);
-        }
-    }, []);
 
     const handleFile = useCallback((file: File) => {
         setUploadError(null);
@@ -89,8 +74,26 @@ const FileUpload: React.FC = () => {
         });
     }, [setCsvData, setFileName, setIsLoading]);
 
+    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDragging(false);
+
+        const files = e.dataTransfer.files;
+        if (files.length) {
+            handleFile(files[0]);
+        }
+    }, [handleFile]);
+
+    const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            handleFile(files[0]);
+        }
+    }, [handleFile]);
+
+
     return (
-        <div className="p-[4rem] xl:p-[6rem]">
+        <div className="p-[4rem] xl:w-[90%] mx-auto">
             <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
                 Upload your CSV file
             </h2>
@@ -152,57 +155,7 @@ const FileUpload: React.FC = () => {
                 )}
             </div>
 
-            <div className="mt-8">
-                <h3 className="text-lg font-medium mb-2 text-gray-800 dark:text-gray-200">
-                    Need a sample?
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    Download one of our sample CSV files to try out the app:
-                </p>
-
-                <div className="space-y-2">
-                    <SampleFileButton
-                        name="Sales Data"
-                        description="10,000 rows of retail sales transactions"
-                        onClick={() => {
-                            // This would typically download a sample file
-                            toast('Sample file functionality not implemented in this demo', {
-                                icon: ''
-                            });
-                        }}
-                    />
-
-                    <SampleFileButton
-                        name="Customer Survey"
-                        description="500 rows of customer feedback responses"
-                        onClick={() => {
-                            toast('Sample file functionality not implemented in this demo', {
-                                icon: ''
-                            });
-                        }}
-                    />
-                </div>
-            </div>
         </div>
-    );
-};
-
-const SampleFileButton: React.FC<{
-    name: string;
-    description: string;
-    onClick: () => void;
-}> = ({ name, description, onClick }) => {
-    return (
-        <button
-            onClick={onClick}
-            className="w-full text-left p-3 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center"
-        >
-            <FileSpreadsheet className="h-5 w-5 text-primary-500 mr-3" />
-            <div>
-                <p className="font-medium text-gray-800 dark:text-gray-200">{name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-500">{description}</p>
-            </div>
-        </button>
     );
 };
 

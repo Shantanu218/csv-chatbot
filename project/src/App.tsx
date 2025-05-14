@@ -25,6 +25,11 @@ const AppContent: React.FC = () => {
 
             return () => clearTimeout(timer);
         }
+        // If csvData is null or falsy, switch to the 'data' tab
+        if (!csvData && activeTab !== 'data') {
+            setActiveTab('data');
+        }
+
     }, [csvData, activeTab]);
 
     return (
@@ -44,7 +49,7 @@ const AppContent: React.FC = () => {
             </main>
 
             <Toaster
-                position="top-right"
+                position="bottom-right"
                 toastOptions={{
                     duration: 2500,
                     removeDelay: 1500,
@@ -64,6 +69,7 @@ const AppContent: React.FC = () => {
                         },
                     },
                     error: {
+                        duration: 5500,
                         style: {
                             background: '#DC2626',
                         },

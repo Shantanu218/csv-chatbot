@@ -1,8 +1,8 @@
 // utils/openai.ts
 import OpenAI from "openai";
 
-const apiKey = import.meta.env.VITE_COMPANY_API_KEY;
 // const apiKey = import.meta.env.VITE_PERSONAL_API_KEY;
+const apiKey = import.meta.env.VITE_COMPANY_API_KEY;
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 

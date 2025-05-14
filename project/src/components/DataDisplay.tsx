@@ -1,15 +1,26 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { ArrowUp, ArrowDown, Download, Search, X } from 'lucide-react';
+import { ArrowUp, ArrowDown, Download, Search, X, Trash2 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { motion } from 'framer-motion';
 import { CSVLink } from 'react-csv';
 
 const DataDisplay: React.FC = () => {
-    const { csvData, fileName } = useData();
+    const { csvData, fileName, setCsvData, setFileName } = useData();
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+    // Search and pagination for data table
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const rowsPerPage = 50;
+    const [rowsToShow, setRowsToShow] = useState(10);
+
+    const rowValues = [5, 10, 25, 50, 100]
+
+
+    const handleDeleteFile = () => {
+        setCsvData(null);
+        setFileName(null);
+    };
+
 
     const handleSort = useCallback((key: string) => {
         setSortConfig(prevSortConfig => {
@@ -63,17 +74,18 @@ const DataDisplay: React.FC = () => {
         });
     }, [sortedData, searchQuery]);
 
-    // Pagination
-    const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-    const currentPageData = useMemo(() => {
-        const startIndex = (currentPage - 1) * rowsPerPage;
-        return filteredData.slice(startIndex, startIndex + rowsPerPage);
-    }, [filteredData, currentPage]);
 
-    // Reset to first page when search changes
+    // Pagination
+    const totalPages = filteredData.length ? Math.ceil(filteredData.length / rowsToShow) : 0;
+    const currentPageData = useMemo(() => {
+        const startIndex = (currentPage - 1) * rowsToShow;
+        return filteredData.slice(startIndex, startIndex + rowsToShow);
+    }, [filteredData, currentPage, rowsToShow]);
+
+    // Reset to first page when search changes, or when rowsToShow changes
     React.useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery]);
+    }, [searchQuery, rowsToShow]);
 
     if (!csvData) {
         return null;
@@ -81,7 +93,7 @@ const DataDisplay: React.FC = () => {
 
     return (
         <motion.div
-            className="p-[4rem] xl:p-[6rem]"
+            className="p-[4rem] xl:w-[90%] mx-auto"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
@@ -97,6 +109,14 @@ const DataDisplay: React.FC = () => {
                 </div>
 
                 <div className="flex space-x-2">
+                    <button
+                        onClick={handleDeleteFile}
+                        className="btn btn-outline flex items-center text-sm text-error-500 hover:bg-error-50 dark:hover:bg-error-950"
+                        title="Delete file"
+                    >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                    </button>
                     <CSVLink
                         data={csvData.data}
                         filename={fileName || 'download.csv'}
@@ -175,64 +195,83 @@ const DataDisplay: React.FC = () => {
 
             {/* Pagination */}
             {totalPages > 1 && (
-                <div className="mt-4 flex items-center justify-between">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Showing {Math.min(filteredData.length, (currentPage - 1) * rowsPerPage + 1)} to{' '}
-                        {Math.min(currentPage * rowsPerPage, filteredData.length)} of {filteredData.length} results
-                    </div>
-
-                    <div className="flex space-x-1">
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                            disabled={currentPage === 1}
-                            className="px-3 py-1 rounded border border-gray-300 dark:border-gray-700 
-                         text-gray-600 dark:text-gray-400 
-                         disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Previous
-                        </button>
-
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                            // Calculate which page numbers to show
-                            let pageNum;
-                            if (totalPages <= 5) {
-                                // If 5 or fewer pages, show all
-                                pageNum = i + 1;
-                            } else if (currentPage <= 3) {
-                                // If near the start
-                                pageNum = i + 1;
-                            } else if (currentPage >= totalPages - 2) {
-                                // If near the end
-                                pageNum = totalPages - 4 + i;
-                            } else {
-                                // In the middle
-                                pageNum = currentPage - 2 + i;
-                            }
-
-                            return (
+                <div>
+                    <div className="mt-4 mb-1 flex items-center justify-between">
+                        <div className="flex space-x-1">
+                            {rowValues.map((value, index) => (
                                 <button
-                                    key={pageNum}
-                                    onClick={() => setCurrentPage(pageNum)}
-                                    className={`px-3 py-1 rounded ${pageNum === currentPage
+                                    key={index}
+                                    value={value}
+                                    onClick={(e) => setRowsToShow(Number(e.target.value))}
+                                    disabled={rowsToShow === value}
+                                    className={`px-4 py-2 rounded border ${rowsToShow === value
                                         ? 'bg-primary-500 text-white'
                                         : 'border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400'
                                         }`}
                                 >
-                                    {pageNum}
+                                    {value}
                                 </button>
-                            );
-                        })}
+                            ))}
+                        </div>
 
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                            disabled={currentPage === totalPages}
-                            className="px-3 py-1 rounded border border-gray-300 dark:border-gray-700 
+                        <div className="flex space-x-1">
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="px-4 py-2 rounded border border-gray-300 dark:border-gray-700 
                          text-gray-600 dark:text-gray-400 
                          disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Next
-                        </button>
+                            >
+                                Previous
+                            </button>
+
+                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                // Calculate which page numbers to show
+                                let pageNum;
+                                if (totalPages <= 5) {
+                                    // If 5 or fewer pages, show all
+                                    pageNum = i + 1;
+                                } else if (currentPage <= 3) {
+                                    // If near the start
+                                    pageNum = i + 1;
+                                } else if (currentPage >= totalPages - 2) {
+                                    // If near the end
+                                    pageNum = totalPages - 4 + i;
+                                } else {
+                                    // In the middle
+                                    pageNum = currentPage - 2 + i;
+                                }
+
+                                return (
+                                    <button
+                                        key={pageNum}
+                                        onClick={() => setCurrentPage(pageNum)}
+                                        className={`px-3 py-1 rounded ${pageNum === currentPage
+                                            ? 'bg-primary-500 text-white'
+                                            : 'border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400'
+                                            }`}
+                                    >
+                                        {pageNum}
+                                    </button>
+                                );
+                            })}
+
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1 rounded border border-gray-300 dark:border-gray-700 
+                         text-gray-600 dark:text-gray-400 
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Next
+                            </button>
+                        </div>
+
                     </div>
+                    <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                        Showing {Math.min(filteredData.length, (currentPage - 1) * rowsToShow + 1)} to{' '}
+                        {Math.min(currentPage * rowsToShow, filteredData.length)} of {filteredData.length} results
+                    </p>
                 </div>
             )}
         </motion.div>

@@ -19,6 +19,7 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+
     const [messages, setMessages] = useState<Message[]>([
         {
             id: uuidv4(),
@@ -110,47 +111,14 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 { role: 'user', content }
             ];
 
-            console.log("messages to send!")
-            console.log(messagesToSend)
-
             // Use your getAIResponse function
             const assistantResponse = await getAIResponse(messagesToSend);
-            console.log(assistantResponse)
-
 
             if (assistantResponse.message.content) {
                 addMessage(assistantResponse.message.content, 'assistant');
             } else {
                 throw new Error('No response from assistant');
             }
-
-
-            // const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            //     method: 'POST',
-            //     headers: {
-            //         'Content-Type': 'application/json',
-            //         'Authorization': `Bearer ${apiKey}`
-            //     },
-            //     body: JSON.stringify({
-            //         model: 'gpt-3.5-turbo',
-            //         messages: messagesToSend,
-            //         temperature: 0.7
-            //     })
-            // });
-
-            // if (!response.ok) {
-            //     const error = await response.json();
-            //     throw new Error(error.error?.message || 'Unknown error');
-            // }
-
-            // const data = await response.json();
-            // const assistantResponse = data.choices[0]?.message?.content;
-
-            // if (assistantResponse) {
-            //     addMessage(assistantResponse, 'assistant');
-            // } else {
-            //     throw new Error('No response from assistant');
-            // }
         } catch (error) {
             console.error('Error sending message:', error);
             toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);

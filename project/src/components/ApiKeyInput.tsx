@@ -3,6 +3,7 @@ import { Key, Eye, EyeOff, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { useApiKey } from '../context/ApiKeyContext';
 import { motion } from 'framer-motion';
 
+// const vite_key = import.meta.env.VITE_PERSONAL_API_KEY;
 const vite_key = import.meta.env.VITE_COMPANY_API_KEY;
 
 const ApiKeyInput: React.FC = () => {
