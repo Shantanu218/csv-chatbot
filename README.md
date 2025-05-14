@@ -7,7 +7,8 @@ Download zip and open folder in preferred IDE after extracting
 
 Steps to run project:
 
-1. cd project
-2. npm install
-3. npm run dev
+1. cd csv-chatbot-main 
+2. cd project
+3. npm install
+4. npm run dev
 
