@@ -21,6 +21,13 @@ export interface Message {
   timestamp: Date;
 }
 
+export interface PromptHistory {
+  id: string;
+  content: string;
+  timestamp: Date;
+  useCount: number;
+}
+
 // API Types
 export interface ApiKeyContextType {
   apiKey: string | null;

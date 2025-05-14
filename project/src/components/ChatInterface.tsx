@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader, PanelRightOpen, PanelRightClose, Search, X } from 'lucide-react';
+import { Send, Bot, User, Loader, PanelRightOpen, PanelRightClose, Search, X, History } from 'lucide-react';
 import { useChat } from '../context/ChatContext';
 import { useData } from '../context/DataContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,19 +7,20 @@ import ApiKeyInput from './ApiKeyInput';
 import { useApiKey } from '../context/ApiKeyContext';
 
 const ChatInterface: React.FC = () => {
-    const { messages, sendMessage, isProcessing } = useChat();
+    const { messages, promptHistory, sendMessage, isProcessing } = useChat();
     const { csvData, fileName } = useData();
     const { apiKey } = useApiKey();
     const [inputValue, setInputValue] = useState('');
     const [showDataPanel, setShowDataPanel] = useState(true);
+    const [showPromptHistory, setShowPromptHistory] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLDivElement>(null);
 
     // Search and pagination for data table
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const rowsPerPage = 30;
+    const [rowsToShow, setRowsToShow] = useState(25);
 
-    // Scroll to bottom when messages change
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
@@ -29,13 +30,12 @@ const ChatInterface: React.FC = () => {
         if (inputValue.trim() && !isProcessing) {
             sendMessage(inputValue);
             setInputValue('');
+            setShowPromptHistory(false);
         }
     };
 
-    // Get visible messages (exclude system messages)
     const visibleMessages = messages.filter(m => m.role !== 'system');
 
-    // Filter data based on search query
     const filteredData = csvData ? csvData.data.filter(row => {
         if (!searchQuery.trim()) return true;
 
@@ -46,21 +46,29 @@ const ChatInterface: React.FC = () => {
         });
     }) : [];
 
-    // Get current page data from filtered results
     const getCurrentPageData = () => {
-        const startIndex = (currentPage - 1) * rowsPerPage;
-        return filteredData.slice(startIndex, startIndex + rowsPerPage);
+        const startIndex = (currentPage - 1) * rowsToShow;
+        return filteredData.slice(startIndex, startIndex + rowsToShow);
     };
 
-    // Reset to first page when search changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery]);
+    }, [searchQuery, rowsToShow]);
 
-    // Calculate total pages from filtered data
-    const totalPages = filteredData.length ? Math.ceil(filteredData.length / rowsPerPage) : 0;
+    const totalPages = filteredData.length ? Math.ceil(filteredData.length / rowsToShow) : 0;
 
-    // Suggestions based on the data
+    // Close prompt history when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
+                setShowPromptHistory(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     const getSuggestions = () => {
         if (!csvData) return [];
 
@@ -90,10 +98,8 @@ const ChatInterface: React.FC = () => {
 
     return (
         <div className="flex h-full">
-            {/* Chat Content */}
             <div className="flex-1 flex flex-col h-full">
-                {/* Messages Area */}
-                <div className="flex-1 overflow-visible resize-both px-4 py-[2rem]">
+                <div className="flex-1 overflow-visible resize-both px-4 py-3">
                     {visibleMessages.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-center px-4">
                             <Bot className="h-16 w-16 text-primary-300 dark:text-primary-700 mb-4" />
@@ -185,17 +191,59 @@ const ChatInterface: React.FC = () => {
                     )}
                 </div>
 
-                {/* Input Area */}
-                <div className="border-t border-gray-200 dark:border-gray-700 p-[2rem]">
+                <div className="border-t border-gray-200 dark:border-gray-700 p-[2rem]" ref={inputRef}>
                     <form onSubmit={handleSubmit} className="flex space-x-2">
-                        <input
-                            type="text"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            placeholder="Ask about your data..."
-                            className="input flex-1"
-                            disabled={isProcessing || !apiKey}
-                        />
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                placeholder="Ask about your data..."
+                                className="input pr-10"
+                                disabled={isProcessing || !apiKey}
+                            />
+                            {promptHistory.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPromptHistory(!showPromptHistory)}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                >
+                                    <History className="h-5 w-5" />
+                                </button>
+                            )}
+
+                            <AnimatePresence>
+                                {showPromptHistory && promptHistory.length > 0 && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 10 }}
+                                        className="absolute bottom-full left-0 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg
+                                        mb-2 max-h-60 overflow-y-auto"
+                                    >
+                                        {promptHistory.map((prompt) => (
+                                            <button
+                                                key={prompt.id}
+                                                onClick={() => {
+                                                    setInputValue(prompt.content);
+                                                    setShowPromptHistory(false);
+                                                }}
+                                                className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between border-b
+                                                border-gray-100 dark:border-gray-700 last:border-0"
+                                            >
+                                                <span className="truncate flex-1 text-gray-700 dark:text-gray-300">
+                                                    {prompt.content}
+                                                </span>
+                                                <span className="text-xs text-gray-400 ml-2 flex-shrink-0">
+                                                    Used {prompt.useCount}×
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
                         <button
                             type="submit"
                             disabled={!inputValue.trim() || isProcessing || !apiKey}
@@ -207,55 +255,67 @@ const ChatInterface: React.FC = () => {
                 </div>
             </div>
 
-            {/* Data Preview Panel */}
             <AnimatePresence>
                 {showDataPanel && (
                     <motion.div
                         initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: '50%', opacity: 1 }}
+                        animate={{ width: '50%', opacity: 1, maxWidth: '1600px' }}
                         exit={{ width: 0, opacity: 0 }}
                         transition={{ duration: 0.3 }}
-                        className="hidden lg:block border-l border-gray-200 dark:border-gray-700 overflow-visible"
+                        className="hidden lg:block border-l border-gray-200 dark:border-gray-700 overflow-hidden"
                     >
                         <div className="h-full flex flex-col">
-                            <div className="p-[2rem] border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                                <h3 className="font-medium text-gray-800 dark:text-gray-200">
-                                    {fileName || 'Data Preview'}
-                                </h3>
-                                <button
-                                    onClick={() => setShowDataPanel(false)}
-                                    className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            <div className="p-[2rem] border-b border-gray-200 dark:border-gray-700">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-medium text-gray-800 dark:text-gray-200">
+                                        {fileName || 'Data Preview'}
+                                    </h3>
+                                    <button
+                                        onClick={() => setShowDataPanel(false)}
+                                        className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                    >
+                                        <PanelRightClose className="h-5 w-5" />
+                                    </button>
+                                </div>
+
+                                <select
+                                    value={rowsToShow}
+                                    onChange={(e) => setRowsToShow(Number(e.target.value))}
+                                    className="input mb-2 text-sm"
                                 >
-                                    <PanelRightClose className="h-5 w-5" />
-                                </button>
+                                    <option value="5">5 rows</option>
+                                    <option value="10">10 rows</option>
+                                    <option value="25">25 rows</option>
+                                    <option value="50">50 rows</option>
+                                    <option value="100">100 rows</option>
+                                </select>
+
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Search className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Search data..."
+                                        className="input pl-10 pr-10 text-sm"
+                                    />
+                                    {searchQuery && (
+                                        <button
+                                            onClick={() => setSearchQuery('')}
+                                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                        >
+                                            <X className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="flex-1 overflow-auto p-[2rem]">
+                            <div className="flex-1 overflow-visible p-[2rem] text-gray-800 dark:text-gray-200">
                                 {csvData && (
-                                    <div className="overflow-x-auto">
-                                        {/* Search Input */}
-                                        <div className="relative mb-4">
-                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <Search className="h-4 w-4 text-gray-400" />
-                                            </div>
-                                            <input
-                                                type="text"
-                                                value={searchQuery}
-                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                placeholder="Search data..."
-                                                className="input pl-10 pr-10 text-sm"
-                                            />
-                                            {searchQuery && (
-                                                <button
-                                                    onClick={() => setSearchQuery('')}
-                                                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                                                >
-                                                    <X className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" />
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        <table className="data-table text-xs">
+                                    <div className="overflow-x-scroll" style={{ scrollbarWidth: "auto", msOverflowStyle: "scrollbar" }}>
+                                        <table className="data-table text-xs" style={{ height: "100%", width: "100%" }}>
                                             <thead>
                                                 <tr>
                                                     {csvData.meta.fields.map((field) => (
@@ -269,7 +329,7 @@ const ChatInterface: React.FC = () => {
                                                 {getCurrentPageData().map((row, rowIndex) => (
                                                     <tr key={rowIndex}>
                                                         {csvData.meta.fields.map((field) => (
-                                                            <td key={`${rowIndex}-${field}`} className="px-2 py-1 truncate max-w-[150px]">
+                                                            <td key={`${rowIndex}-${field}`} className="px-2 py-1">
                                                                 {row[field] !== null && row[field] !== undefined
                                                                     ? String(row[field])
                                                                     : ''}
@@ -280,19 +340,18 @@ const ChatInterface: React.FC = () => {
                                             </tbody>
                                         </table>
 
-                                        {/* Table Pagination */}
                                         {totalPages > 1 && (
                                             <div className="mt-4 mb-4 flex items-center justify-between">
-                                                <div className="text-xs text-gray-500">
-                                                    Showing {Math.min(filteredData.length, (currentPage - 1) * rowsPerPage + 1)} to{' '}
-                                                    {Math.min(currentPage * rowsPerPage, filteredData.length)} of {filteredData.length} rows
+                                                <div className="text-[1rem] text-gray-500">
+                                                    Showing {Math.min(filteredData.length, (currentPage - 1) * rowsToShow + 1)} to{' '}
+                                                    {Math.min(currentPage * rowsToShow, filteredData.length)} of {filteredData.length} rows
                                                 </div>
 
                                                 <div className="flex space-x-1">
                                                     <button
                                                         onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                                         disabled={currentPage === 1}
-                                                        className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-700 
+                                                        className="px-4 py-2 text-xs rounded border border-gray-300 dark:border-gray-700 
                                                         text-gray-600 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         Previous
@@ -314,7 +373,7 @@ const ChatInterface: React.FC = () => {
                                                             <button
                                                                 key={pageNum}
                                                                 onClick={() => setCurrentPage(pageNum)}
-                                                                className={`px-2 py-1 text-xs rounded ${pageNum === currentPage
+                                                                className={`px-4 py-2 text-[1rem] rounded ${pageNum === currentPage
                                                                     ? 'bg-primary-500 text-white'
                                                                     : 'border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400'
                                                                     }`}
@@ -327,7 +386,7 @@ const ChatInterface: React.FC = () => {
                                                     <button
                                                         onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                                                         disabled={currentPage === totalPages}
-                                                        className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-700 
+                                                        className="px-4 py-2 text-xs rounded border border-gray-300 dark:border-gray-700 
                                                         text-gray-600 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         Next
@@ -343,23 +402,19 @@ const ChatInterface: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            {/* Toggle button for data panel on larger screens */}
-            {!showDataPanel && (
-                <button
-                    onClick={() => setShowDataPanel(true)}
-                    className="hidden lg:flex items-center justify-center h-10 w-10 m-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 
-                    dark:hover:bg-gray-700 text-gray-500"
-                >
-                    <PanelRightOpen className="h-5 w-5" />
-                </button>
-            )}
-        </div>
+            {
+                !showDataPanel && (
+                    <button
+                        onClick={() => setShowDataPanel(true)}
+                        className="hidden lg:flex items-center justify-center h-10 w-10 m-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-
+                    text-gray-800 dark:text-gray-200"
+                    >
+                        <PanelRightOpen className="h-5 w-5" />
+                    </button>
+                )
+            }
+        </div >
     );
 };
 
 export default ChatInterface;
-
-
-
-
-

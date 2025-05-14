@@ -1,38 +1,22 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { Message } from '../types';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { Message, PromptHistory } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { useApiKey } from './ApiKeyContext';
 import { useData } from './DataContext';
 import toast from 'react-hot-toast';
-
-// Define the shape of our chat context
-interface ChatContextType {
-    messages: Message[]; // Array of all chat messages
-    addMessage: (content: string, role: 'user' | 'assistant' | 'system') => void; // Function to manually add a message
-    sendMessage: (content: string) => Promise<void>; // Function to send a message to OpenAI API
-    isProcessing: boolean; // Flag indicating if a message is being processed
-}
-
-// Create the context with undefined initial value
-const ChatContext = createContext<ChatContextType | undefined>(undefined);
-
+import { getAIResponse } from "../utils/openai";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-    apiKey: "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", dangerouslyAllowBrowser: true
-});
 
-const completion = openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    store: true,
-    messages: [
-        { "role": "user", "content": "You are a helpful assistant that analyzes CSV data. The user will upload a CSV file and you will help them extract insights from it." },
-    ],
-});
+interface ChatContextType {
+    messages: Message[];
+    promptHistory: PromptHistory[];
+    addMessage: (content: string, role: 'user' | 'assistant' | 'system') => void;
+    sendMessage: (content: string) => Promise<void>;
+    isProcessing: boolean;
+}
 
-completion.then((result) => console.log(result.choices[0]));
-console.log("RESULT ON TOP")
-
+const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [messages, setMessages] = useState<Message[]>([
@@ -43,11 +27,17 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             timestamp: new Date()
         }
     ]);
+
+    const [promptHistory, setPromptHistory] = useState<PromptHistory[]>(() => {
+        // const saved = localStorage.getItem('promptHistory');
+        // return saved ? JSON.parse(saved) : [];
+        const saved: PromptHistory[] = [];
+        return saved;
+    });
+
     const [isProcessing, setIsProcessing] = useState(false);
 
     const { apiKey } = useApiKey();
-    console.log("THIS IS THE API KEY I EXTRACTED")
-    console.log(apiKey)
     const { csvData } = useData();
 
     const addMessage = useCallback((content: string, role: 'user' | 'assistant' | 'system') => {
@@ -62,6 +52,34 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return newMessage;
     }, []);
 
+
+    const updatePromptHistory = useCallback((content: string) => {
+        setPromptHistory((prev) => {
+            const existing = prev.find((p) => p.content === content);
+            let updatedHistory: PromptHistory[];
+
+            if (existing) {
+                // Update existing prompt
+                updatedHistory = prev.map((p) =>
+                    p.content === content
+                        ? { ...p, useCount: p.useCount + 1, timestamp: new Date() }
+                        : p
+                );
+            } else {
+                // Add new prompt
+                const newPrompt: PromptHistory = {
+                    id: Date.now().toString(),
+                    content,
+                    timestamp: new Date(),
+                    useCount: 1
+                };
+                updatedHistory = [newPrompt, ...prev];
+            }
+
+            return updatedHistory.slice(0, 10); // Keep last 10
+        });
+    }, []);
+
     const sendMessage = useCallback(async (content: string) => {
         if (!apiKey) {
             toast.error('Please add your OpenAI API key first');
@@ -73,69 +91,77 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return;
         }
 
-
-        // Add the user message
+        updatePromptHistory(content);
         addMessage(content, 'user');
         setIsProcessing(true);
 
         try {
-            // Prepare the system message to include information about the CSV data
             const systemMessage = `You are analyzing a CSV file with the following columns: ${csvData.meta.fields.join(', ')}. 
       The file contains ${csvData.data.length} rows of data. 
-      Here's a sample of the data: ${JSON.stringify(csvData.data.slice(0, 3))}`;
+      Here's the data: ${JSON.stringify(csvData.data)}`;
 
-            // Prepare messages for the API
-            const messagesToSend = [
+            const messagesToSend: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
                 { role: 'system', content: systemMessage },
                 ...messages
-                    .filter(m => m.role !== 'system')
-                    .map(m => ({ role: m.role, content: m.content })),
+                    .map(m => ({
+                        role: m.role as 'user' | 'assistant' | 'system', // Explicit type assertion
+                        content: m.content
+                    })),
                 { role: 'user', content }
             ];
 
-            // Make the API request
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                    model: 'gpt-3.5-turbo',
-                    messages: messagesToSend,
-                    temperature: 0.7
-                })
-            });
+            console.log("messages to send!")
+            console.log(messagesToSend)
 
-            console.log(response)
-            console.log("CHAT WINDOW")
+            // Use your getAIResponse function
+            const assistantResponse = await getAIResponse(messagesToSend);
+            console.log(assistantResponse)
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error?.message || 'Unknown error');
-            }
 
-            const data = await response.json();
-            const assistantResponse = data.choices[0]?.message?.content;
-
-            if (assistantResponse) {
-                addMessage(assistantResponse, 'assistant');
+            if (assistantResponse.message.content) {
+                addMessage(assistantResponse.message.content, 'assistant');
             } else {
                 throw new Error('No response from assistant');
             }
+
+
+            // const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            //     method: 'POST',
+            //     headers: {
+            //         'Content-Type': 'application/json',
+            //         'Authorization': `Bearer ${apiKey}`
+            //     },
+            //     body: JSON.stringify({
+            //         model: 'gpt-3.5-turbo',
+            //         messages: messagesToSend,
+            //         temperature: 0.7
+            //     })
+            // });
+
+            // if (!response.ok) {
+            //     const error = await response.json();
+            //     throw new Error(error.error?.message || 'Unknown error');
+            // }
+
+            // const data = await response.json();
+            // const assistantResponse = data.choices[0]?.message?.content;
+
+            // if (assistantResponse) {
+            //     addMessage(assistantResponse, 'assistant');
+            // } else {
+            //     throw new Error('No response from assistant');
+            // }
         } catch (error) {
             console.error('Error sending message:', error);
             toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-
-            // Add an error message from the assistant
             addMessage('I encountered an error while processing your request. Please try again or check your API key.', 'assistant');
         } finally {
             setIsProcessing(false);
         }
-    }, [apiKey, csvData, messages, addMessage]);
+    }, [apiKey, csvData, messages, addMessage, updatePromptHistory]);
 
     return (
-        <ChatContext.Provider value={{ messages, addMessage, sendMessage, isProcessing }}>
+        <ChatContext.Provider value={{ messages, promptHistory, addMessage, sendMessage, isProcessing }}>
             {children}
         </ChatContext.Provider>
     );

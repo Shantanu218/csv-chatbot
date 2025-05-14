@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 // Create the context
 const ApiKeyContext = createContext<ApiKeyContextType | undefined>(undefined);
 
+
 // Provider component
 export const ApiKeyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [apiKey, setApiKey] = useState<string | null>(() => {

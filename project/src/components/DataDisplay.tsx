@@ -86,9 +86,9 @@ const DataDisplay: React.FC = () => {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
         >
-            <div className="flex justify-between items-center mb-4 h-full">
+            <div className="flex justify-between items-center mb-4 h-full text-gray-800 dark:text-gray-200">
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
+                    <h2 className="text-xl font-semibold">
                         {fileName || 'CSV Data'}
                     </h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -96,7 +96,7 @@ const DataDisplay: React.FC = () => {
                     </p>
                 </div>
 
-                <div className="flex space-x-2 text-gray-800 dark:text-gray-200">
+                <div className="flex space-x-2">
                     <CSVLink
                         data={csvData.data}
                         filename={fileName || 'download.csv'}
@@ -129,7 +129,7 @@ const DataDisplay: React.FC = () => {
                 )}
             </div>
 
-            <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="overflow-x-scroll rounded-lg border border-gray-200 dark:border-gray-700" style={{ scrollbarWidth: "auto", msOverflowStyle: "scrollbar" }}>
                 <table className="data-table bg-white dark:bg-gray-800">
                     <thead>
                         <tr>
